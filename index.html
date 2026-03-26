@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0a0a0a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.json">
+<title>Spent</title>
+<!-- No external fonts - fully self-contained -->
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  :root {
+    --bg: #0a0a0a;
+    --surface: #151515;
+    --surface2: #1e1e1e;
+    --border: #2a2a2a;
+    --text: #e8e8e8;
+    --text2: #888;
+    --accent: #c8ff00;
+    --accent-dim: #3a4a00;
+    --red: #ff4444;
+    --green: #44cc66;
+    --radius: 16px;
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, 'Segoe UI', Roboto, sans-serif;
+    overflow: hidden;
+  }
+
+  .app {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    max-width: 480px;
+    margin: 0 auto;
+  }
+
+  /* ── Header ── */
+  .header {
+    padding: 16px 20px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  .logo {
+    font-family: ui-monospace, 'Cascadia Code', 'Menlo', 'Consolas', monospace;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -1px;
+    color: var(--accent);
+  }
+
+  .month-nav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .month-nav button {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text2);
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .month-label {
+    font-family: ui-monospace, 'Cascadia Code', 'Menlo', 'Consolas', monospace;
+    font-size: 13px;
+    color: var(--text2);
+    min-width: 90px;
+    text-align: center;
+  }
+
+  /* ── Summary ── */
+  .summary {
+    padding: 8px 20px 16px;
+    flex-shrink: 0;
+  }
+
+  .total-amount {
+    font-family: ui-monospace, 'Cascadia Code', 'Menlo', 'Consolas', monospace;
+    font-size: 42px;
+    font-weight: 700;
+    letter-spacing: -2px;
+    line-height: 1;
+  }
+
+  .total-label {
+    font-size: 12px;
+    color: var(--text2);
+    margin-top: 4px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  /* ── Entry list ── */
+  .list-container {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 20px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .day-group {
+    margin-bottom: 20px;
+  }
+
+  .day-header {
+    font-family: ui-monospace, 'Cascadia Code', 'Menlo', 'Consolas', monospace;
+    font-size: 11px;
+    color: var(--text2);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .entry {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 14px;
+    background: var(--surface);
+    border-radius: 12px;
+    margin-bottom: 6px;
+    position: relative;
+    transition: transform 0.15s, opacity 0.15s;
+  }
+
+  .entry:active {
+    transform: scale(0.98);
+  }
+
+  .entry-left {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .entry-comment {
+    font-size: 15px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .entry-time {
+    font-family: ui-monospace, 'Cascadia Code', 'Menlo', 'Consolas', monospace;
+    font-size: 11px;
+    color: var(--text2);
+    margin-top: 2px;
+  }
+
+  .entry-amount {
+    font-family: ui-monospace, 'Cascadia Code', 'Menlo', 'Consolas', monospace;
+    font-size: 16px;
+    font-weight: 700;
+    margin-left: 12px;
+    flex-shrink: 0;
+  }
+
+  .entry-running {
+    font-family: ui-monospace, 'Cascadia Code', 'Menlo', 'Consolas', monospace;
+    font-size: 11px;
+    color: var(--text2);
+    margin-left: 12px;
+    flex-shrink: 0;
+    text-align: right;
+  }
+
+  .entry-delete {
+    position: absolute;
+    right: -6px;
+    top: -6px;
+    width: 22px;
+    height: 22px;
+    background: var(--red);
+    border: 2px solid var(--bg);
+    border-radius: 50%;
+    color: #fff;
+    font-size: 12px;
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+  }
+
+  .entry:hover .entry-delete,
+  .entry:active .entry-delete {
+    display: flex;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text2);
+  }
+
+  .empty-state .icon {
+    font-size: 48px;
+    margin-bottom: 12px;
+    opacity: 0.3;
+  }
+
+  /* ── Input area ── */
+  .input-area {
+    flex-shrink: 0;
+    padding: 12px 20px;
+    padding-bottom: calc(12px + var(--safe-bottom));
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+  }
+
+  .input-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .input-amount {
+    font-family: ui-monospace, 'Cascadia Code', 'Menlo', 'Consolas', monospace;
+    font-size: 20px;
+    font-weight: 700;
+    background: var(--bg);
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    color: var(--text);
+    padding: 12px 14px;
+    width: 130px;
+    outline: none;
+    transition: border-color 0.2s;
+    -moz-appearance: textfield;
+  }
+
+  .input-amount::-webkit-inner-spin-button,
+  .input-amount::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+  }
+
+  .input-amount:focus {
+    border-color: var(--accent);
+  }
+
+  .input-comment {
+    font-family: -apple-system, 'Segoe UI', Roboto, sans-serif;
+    font-size: 15px;
+    background: var(--bg);
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    color: var(--text);
+    padding: 12px 14px;
+    flex: 1;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .input-comment:focus {
+    border-color: var(--accent);
+  }
+
+  .btn-add {
+    width: 100%;
+    padding: 16px;
+    font-family: ui-monospace, 'Cascadia Code', 'Menlo', 'Consolas', monospace;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    background: var(--accent);
+    color: #000;
+    border: none;
+    border-radius: 14px;
+    cursor: pointer;
+    transition: transform 0.1s, opacity 0.1s;
+  }
+
+  .btn-add:active {
+    transform: scale(0.97);
+    opacity: 0.85;
+  }
+
+  .btn-add:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  /* ── Menu ── */
+  .menu-btn {
+    background: none;
+    border: none;
+    color: var(--text2);
+    font-size: 22px;
+    cursor: pointer;
+    padding: 4px;
+  }
+
+  .menu-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 100;
+    backdrop-filter: blur(4px);
+  }
+
+  .menu-overlay.open { display: block; }
+
+  .menu-panel {
+    position: fixed;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: 480px;
+    background: var(--surface);
+    border-radius: 20px 20px 0 0;
+    padding: 24px 20px;
+    padding-bottom: calc(24px + var(--safe-bottom));
+    z-index: 101;
+  }
+
+  .menu-panel h3 {
+    font-family: ui-monospace, 'Cascadia Code', 'Menlo', 'Consolas', monospace;
+    font-size: 14px;
+    color: var(--text2);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 16px;
+  }
+
+  .menu-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    color: var(--text);
+    font-size: 15px;
+    font-weight: 500;
+    background: none;
+    border-left: none;
+    border-right: none;
+    border-top: none;
+    width: 100%;
+    text-align: left;
+  }
+
+  .menu-item:last-child { border-bottom: none; }
+
+  .menu-item .mi-icon {
+    font-size: 20px;
+    width: 28px;
+    text-align: center;
+  }
+
+  .menu-close {
+    margin-top: 12px;
+    width: 100%;
+    padding: 14px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    color: var(--text2);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  /* ── Toast ── */
+  .toast {
+    position: fixed;
+    bottom: 100px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--accent);
+    color: #000;
+    font-family: ui-monospace, 'Cascadia Code', 'Menlo', 'Consolas', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 10px 20px;
+    border-radius: 10px;
+    opacity: 0;
+    transition: all 0.3s;
+    pointer-events: none;
+    z-index: 200;
+  }
+
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  /* ── Animations ── */
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry { animation: slideUp 0.25s ease-out; }
+
+  /* scrollbar */
+  .list-container::-webkit-scrollbar { width: 4px; }
+  .list-container::-webkit-scrollbar-track { background: transparent; }
+  .list-container::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  ::placeholder { color: #555; }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- Header -->
+  <div class="header">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <span class="logo">spent.</span>
+      <div class="month-nav">
+        <button onclick="changeMonth(-1)">‹</button>
+        <span class="month-label" id="monthLabel"></span>
+        <button onclick="changeMonth(1)">›</button>
+      </div>
+    </div>
+    <button class="menu-btn" onclick="toggleMenu()">⋯</button>
+  </div>
+
+  <!-- Summary -->
+  <div class="summary">
+    <div class="total-amount" id="totalAmount">$0</div>
+    <div class="total-label">this month</div>
+  </div>
+
+  <!-- List -->
+  <div class="list-container" id="listContainer"></div>
+
+  <!-- Input -->
+  <div class="input-area">
+    <div class="input-row">
+      <input type="number" class="input-amount" id="amountInput" placeholder="0.00" inputmode="decimal" step="0.01">
+      <input type="text" class="input-comment" id="commentInput" placeholder="What was it for?" maxlength="100">
+    </div>
+    <button class="btn-add" id="addBtn" onclick="addEntry()" disabled>+ Add Expense</button>
+  </div>
+</div>
+
+<!-- Menu overlay -->
+<div class="menu-overlay" id="menuOverlay" onclick="toggleMenu()">
+  <div class="menu-panel" onclick="event.stopPropagation()">
+    <h3>Options</h3>
+    <button class="menu-item" onclick="exportCSV()">
+      <span class="mi-icon">📄</span> Export CSV
+    </button>
+    <button class="menu-item" onclick="emailCSV()">
+      <span class="mi-icon">✉️</span> Send via Email
+    </button>
+    <button class="menu-item" onclick="clearMonth()">
+      <span class="mi-icon">🗑️</span> Clear this month
+    </button>
+    <button class="menu-close" onclick="toggleMenu()">Close</button>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ── State ──
+const STORAGE_KEY = 'spent_entries';
+let viewYear, viewMonth; // 0-indexed month
+
+function now() { return new Date(); }
+
+function initMonth() {
+  const d = now();
+  viewYear = d.getFullYear();
+  viewMonth = d.getMonth();
+}
+
+// ── Storage ──
+function loadAll() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+  } catch { return []; }
+}
+
+function saveAll(entries) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+}
+
+// ── Filtering ──
+function getMonthEntries() {
+  return loadAll().filter(e => {
+    const d = new Date(e.ts);
+    return d.getFullYear() === viewYear && d.getMonth() === viewMonth;
+  }).sort((a, b) => b.ts - a.ts);
+}
+
+// ── Rendering ──
+function render() {
+  // Month label
+  const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  document.getElementById('monthLabel').textContent = `${monthNames[viewMonth]} ${viewYear}`;
+
+  const entries = getMonthEntries();
+  const total = entries.reduce((s, e) => s + e.amount, 0);
+  document.getElementById('totalAmount').textContent = formatMoney(total);
+
+  const container = document.getElementById('listContainer');
+
+  if (entries.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="icon">○</div>
+        <div>No expenses yet</div>
+      </div>`;
+    return;
+  }
+
+  // Group by day
+  const groups = {};
+  entries.forEach(e => {
+    const d = new Date(e.ts);
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(e);
+  });
+
+  // Running sum (chronological — oldest first)
+  const chronological = [...entries].reverse();
+  let running = 0;
+  const runningMap = {};
+  chronological.forEach(e => {
+    running += e.amount;
+    runningMap[e.ts] = running;
+  });
+
+  let html = '';
+  const sortedDays = Object.keys(groups).sort().reverse();
+
+  sortedDays.forEach(day => {
+    const d = new Date(day + 'T12:00:00');
+    const dayLabel = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    const dayTotal = groups[day].reduce((s, e) => s + e.amount, 0);
+
+    html += `<div class="day-group">`;
+    html += `<div class="day-header"><span>${dayLabel}</span><span>${formatMoney(dayTotal)}</span></div>`;
+
+    groups[day].forEach(e => {
+      const t = new Date(e.ts);
+      const time = t.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+      html += `
+        <div class="entry">
+          <button class="entry-delete" onclick="deleteEntry(${e.ts})" title="Delete">✕</button>
+          <div class="entry-left">
+            <div class="entry-comment">${escapeHtml(e.comment || '—')}</div>
+            <div class="entry-time">${time}</div>
+          </div>
+          <div style="text-align:right">
+            <div class="entry-amount">${formatMoney(e.amount)}</div>
+            <div class="entry-running">Σ ${formatMoney(runningMap[e.ts])}</div>
+          </div>
+        </div>`;
+    });
+
+    html += `</div>`;
+  });
+
+  container.innerHTML = html;
+}
+
+function formatMoney(n) {
+  return '$' + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function escapeHtml(s) {
+  const div = document.createElement('div');
+  div.textContent = s;
+  return div.innerHTML;
+}
+
+// ── Actions ──
+function addEntry() {
+  const amountEl = document.getElementById('amountInput');
+  const commentEl = document.getElementById('commentInput');
+  const amount = parseFloat(amountEl.value);
+  if (!amount || amount <= 0) return;
+
+  const entries = loadAll();
+  entries.push({
+    amount: Math.round(amount * 100) / 100,
+    comment: commentEl.value.trim(),
+    ts: Date.now()
+  });
+  saveAll(entries);
+
+  amountEl.value = '';
+  commentEl.value = '';
+  document.getElementById('addBtn').disabled = true;
+
+  // Jump to current month if adding
+  const d = now();
+  viewYear = d.getFullYear();
+  viewMonth = d.getMonth();
+
+  render();
+  toast('Added!');
+
+  // Scroll to top
+  document.getElementById('listContainer').scrollTop = 0;
+}
+
+function deleteEntry(ts) {
+  if (!confirm('Delete this entry?')) return;
+  const entries = loadAll().filter(e => e.ts !== ts);
+  saveAll(entries);
+  render();
+  toast('Deleted');
+}
+
+function changeMonth(dir) {
+  viewMonth += dir;
+  if (viewMonth > 11) { viewMonth = 0; viewYear++; }
+  if (viewMonth < 0) { viewMonth = 11; viewYear--; }
+  render();
+}
+
+// ── Export ──
+function generateCSV() {
+  const entries = getMonthEntries().reverse(); // chronological
+  const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  let csv = 'Date,Time,Amount,Comment,Running Total\n';
+  let running = 0;
+  entries.forEach(e => {
+    const d = new Date(e.ts);
+    running += e.amount;
+    const date = d.toLocaleDateString('en-US');
+    const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    const comment = '"' + (e.comment || '').replace(/"/g, '""') + '"';
+    csv += `${date},${time},${e.amount.toFixed(2)},${comment},${running.toFixed(2)}\n`;
+  });
+  return { csv, filename: `spent_${monthNames[viewMonth]}_${viewYear}.csv` };
+}
+
+function exportCSV() {
+  const { csv, filename } = generateCSV();
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+  toggleMenu();
+  toast('CSV downloaded');
+}
+
+function emailCSV() {
+  const { csv, filename } = generateCSV();
+  const entries = getMonthEntries();
+  const total = entries.reduce((s, e) => s + e.amount, 0);
+  const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const subject = encodeURIComponent(`Spent — ${monthNames[viewMonth]} ${viewYear}: ${formatMoney(total)}`);
+  const body = encodeURIComponent(`${monthNames[viewMonth]} ${viewYear} expenses: ${formatMoney(total)}\n${entries.length} entries\n\n` + csv);
+  window.location.href = `mailto:?subject=${subject}&body=${body}`;
+  toggleMenu();
+}
+
+function clearMonth() {
+  const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  if (!confirm(`Delete all entries for ${monthNames[viewMonth]} ${viewYear}?`)) return;
+  const entries = loadAll().filter(e => {
+    const d = new Date(e.ts);
+    return !(d.getFullYear() === viewYear && d.getMonth() === viewMonth);
+  });
+  saveAll(entries);
+  render();
+  toggleMenu();
+  toast('Month cleared');
+}
+
+// ── Menu ──
+function toggleMenu() {
+  document.getElementById('menuOverlay').classList.toggle('open');
+}
+
+// ── Toast ──
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 1500);
+}
+
+// ── Input validation ──
+document.getElementById('amountInput').addEventListener('input', function() {
+  document.getElementById('addBtn').disabled = !this.value || parseFloat(this.value) <= 0;
+});
+
+// Enter key to add
+document.getElementById('commentInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') addEntry();
+});
+document.getElementById('amountInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') document.getElementById('commentInput').focus();
+});
+
+// ── Init ──
+initMonth();
+render();
+
+// ── Service Worker Registration ──
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js');
+}
+</script>
+</body>
+</html>
