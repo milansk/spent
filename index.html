@@ -90,24 +90,8 @@
 
   /* ── Summary ── */
   .summary {
-    padding: 8px 20px 16px;
+    padding: 4px 20px 12px;
     flex-shrink: 0;
-  }
-
-  .total-amount {
-    font-family: ui-monospace, 'Cascadia Code', 'Menlo', 'Consolas', monospace;
-    font-size: 42px;
-    font-weight: 700;
-    letter-spacing: -2px;
-    line-height: 1;
-  }
-
-  .total-label {
-    font-size: 12px;
-    color: var(--text2);
-    margin-top: 4px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
   }
 
   /* ── Entry list ── */
@@ -427,6 +411,133 @@
   .list-container::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
   ::placeholder { color: #555; }
+
+  /* ── Category dropdown ── */
+  .input-category {
+    font-family: ui-monospace, 'Cascadia Code', 'Menlo', 'Consolas', monospace;
+    font-size: 14px;
+    font-weight: 600;
+    background: var(--bg);
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    color: var(--text);
+    padding: 12px 10px;
+    width: 95px;
+    flex-shrink: 0;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.2s;
+    -webkit-appearance: none;
+    appearance: none;
+    text-align: center;
+  }
+
+  .input-category:focus {
+    border-color: var(--accent);
+  }
+
+  /* ── Date button ── */
+  .date-btn-wrap {
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .date-btn-wrap input[type="date"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    pointer-events: none;
+    width: 100%;
+    height: 100%;
+  }
+
+  .input-date-btn {
+    font-family: ui-monospace, 'Cascadia Code', 'Menlo', 'Consolas', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    background: var(--bg);
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    color: var(--text);
+    padding: 12px 10px;
+    min-width: 68px;
+    cursor: pointer;
+    transition: border-color 0.2s, color 0.2s;
+    white-space: nowrap;
+  }
+
+  .input-date-btn.is-custom {
+    border-color: var(--accent-dim);
+    color: var(--accent);
+  }
+
+  /* ── Category summary ── */
+  .cat-black-amount {
+    font-family: ui-monospace, 'Cascadia Code', 'Menlo', 'Consolas', monospace;
+    font-size: 38px;
+    font-weight: 700;
+    letter-spacing: -1.5px;
+    line-height: 1;
+    color: var(--text);
+  }
+
+  .cat-black-label {
+    font-size: 11px;
+    color: var(--text2);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 3px;
+  }
+
+  .cat-others {
+    margin-top: 10px;
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+  }
+
+  .cat-total-item {
+    margin-left: auto;
+    text-align: right;
+  }
+
+  .cat-total-val {
+    font-family: ui-monospace, 'Cascadia Code', 'Menlo', 'Consolas', monospace;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text2);
+  }
+
+  .cat-other-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .cat-other-name {
+    font-size: 10px;
+    color: var(--text2);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .cat-other-val {
+    font-family: ui-monospace, 'Cascadia Code', 'Menlo', 'Consolas', monospace;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  /* ── Entry category badge ── */
+  .entry-cat {
+    font-family: ui-monospace, 'Cascadia Code', 'Menlo', 'Consolas', monospace;
+    font-size: 10px;
+    color: var(--text2);
+    background: var(--surface2);
+    padding: 1px 5px;
+    border-radius: 4px;
+    margin-left: 6px;
+  }
 </style>
 </head>
 <body>
@@ -447,8 +558,26 @@
 
   <!-- Summary -->
   <div class="summary">
-    <div class="total-amount" id="totalAmount">$0</div>
-    <div class="total-label">this month</div>
+    <div class="cat-black-amount" id="catBlack">$0</div>
+    <div class="cat-black-label">Black</div>
+    <div class="cat-others">
+      <div class="cat-other-item">
+        <div class="cat-other-name">Mid</div>
+        <div class="cat-other-val" id="catMid">$0</div>
+      </div>
+      <div class="cat-other-item">
+        <div class="cat-other-name">Small</div>
+        <div class="cat-other-val" id="catSmall">$0</div>
+      </div>
+      <div class="cat-other-item">
+        <div class="cat-other-name">CCTE</div>
+        <div class="cat-other-val" id="catCCTE">$0</div>
+      </div>
+      <div class="cat-other-item cat-total-item">
+        <div class="cat-other-name">Total</div>
+        <div class="cat-total-val" id="totalAmount">$0</div>
+      </div>
+    </div>
   </div>
 
   <!-- List -->
@@ -456,8 +585,20 @@
 
   <!-- Input -->
   <div class="input-area">
-    <div class="input-row">
+    <div class="input-row" style="margin-bottom:8px">
       <input type="number" class="input-amount" id="amountInput" placeholder="0.00" inputmode="decimal" step="0.01">
+      <select class="input-category" id="categoryInput">
+        <option value="Black">Black</option>
+        <option value="Mid">Mid</option>
+        <option value="Small">Small</option>
+        <option value="CCTE">CCTE</option>
+      </select>
+      <div class="date-btn-wrap">
+        <input type="date" id="datePickerInput" onchange="onDateChange()">
+        <button class="input-date-btn" id="dateBtnDisplay" onclick="openDatePicker()">Today</button>
+      </div>
+    </div>
+    <div class="input-row">
       <input type="text" class="input-comment" id="commentInput" placeholder="What was it for?" maxlength="100">
     </div>
     <button class="btn-add" id="addBtn" onclick="addEntry()" disabled>+ Add Expense</button>
@@ -526,6 +667,13 @@ function render() {
   const total = entries.reduce((s, e) => s + e.amount, 0);
   document.getElementById('totalAmount').textContent = formatMoney(total);
 
+  const catTotals = { Black: 0, Mid: 0, Small: 0, CCTE: 0 };
+  entries.forEach(e => { catTotals[e.category || 'Black'] += e.amount; });
+  document.getElementById('catBlack').textContent = formatMoney(catTotals.Black);
+  document.getElementById('catMid').textContent = formatMoney(catTotals.Mid);
+  document.getElementById('catSmall').textContent = formatMoney(catTotals.Small);
+  document.getElementById('catCCTE').textContent = formatMoney(catTotals.CCTE);
+
   const container = document.getElementById('listContainer');
 
   if (entries.length === 0) {
@@ -574,7 +722,7 @@ function render() {
           <button class="entry-delete" onclick="deleteEntry(${e.ts})" title="Delete">✕</button>
           <div class="entry-left">
             <div class="entry-comment">${escapeHtml(e.comment || '—')}</div>
-            <div class="entry-time">${time}</div>
+            <div class="entry-time">${time}<span class="entry-cat">${escapeHtml(e.category || 'Black')}</span></div>
           </div>
           <div style="text-align:right">
             <div class="entry-amount">${formatMoney(e.amount)}</div>
@@ -599,18 +747,54 @@ function escapeHtml(s) {
   return div.innerHTML;
 }
 
+// ── Date helpers ──
+function getTodayString() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+function openDatePicker() {
+  const input = document.getElementById('datePickerInput');
+  try { input.showPicker(); } catch(e) { input.focus(); }
+}
+
+function onDateChange() {
+  const val = document.getElementById('datePickerInput').value;
+  const btn = document.getElementById('dateBtnDisplay');
+  if (!val || val === getTodayString()) {
+    btn.textContent = 'Today';
+    btn.classList.remove('is-custom');
+  } else {
+    const d = new Date(val + 'T12:00:00');
+    btn.textContent = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    btn.classList.add('is-custom');
+  }
+}
+
 // ── Actions ──
 function addEntry() {
   const amountEl = document.getElementById('amountInput');
   const commentEl = document.getElementById('commentInput');
+  const categoryEl = document.getElementById('categoryInput');
   const amount = parseFloat(amountEl.value);
   if (!amount || amount <= 0) return;
+
+  const dateVal = document.getElementById('datePickerInput').value;
+  let ts;
+  if (!dateVal || dateVal === getTodayString()) {
+    ts = Date.now();
+  } else {
+    const t = new Date();
+    const [y, mo, da] = dateVal.split('-').map(Number);
+    ts = new Date(y, mo - 1, da, t.getHours(), t.getMinutes(), t.getSeconds()).getTime();
+  }
 
   const entries = loadAll();
   entries.push({
     amount: Math.round(amount * 100) / 100,
     comment: commentEl.value.trim(),
-    ts: Date.now()
+    category: categoryEl.value,
+    ts
   });
   saveAll(entries);
 
@@ -618,15 +802,17 @@ function addEntry() {
   commentEl.value = '';
   document.getElementById('addBtn').disabled = true;
 
-  // Jump to current month if adding
-  const d = now();
-  viewYear = d.getFullYear();
-  viewMonth = d.getMonth();
+  // Reset date to today
+  document.getElementById('datePickerInput').value = getTodayString();
+  onDateChange();
+
+  // Jump to the month of the added entry
+  const entryDate = new Date(ts);
+  viewYear = entryDate.getFullYear();
+  viewMonth = entryDate.getMonth();
 
   render();
   toast('Added!');
-
-  // Scroll to top
   document.getElementById('listContainer').scrollTop = 0;
 }
 
@@ -649,15 +835,16 @@ function changeMonth(dir) {
 function generateCSV() {
   const entries = getMonthEntries().reverse(); // chronological
   const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-  let csv = 'Date,Time,Amount,Comment,Running Total\n';
+  let csv = 'Date,Time,Amount,Category,Comment,Running Total\n';
   let running = 0;
   entries.forEach(e => {
     const d = new Date(e.ts);
     running += e.amount;
     const date = d.toLocaleDateString('en-US');
     const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    const category = e.category || 'Black';
     const comment = '"' + (e.comment || '').replace(/"/g, '""') + '"';
-    csv += `${date},${time},${e.amount.toFixed(2)},${comment},${running.toFixed(2)}\n`;
+    csv += `${date},${time},${e.amount.toFixed(2)},${category},${comment},${running.toFixed(2)}\n`;
   });
   return { csv, filename: `spent_${monthNames[viewMonth]}_${viewYear}.csv` };
 }
@@ -727,6 +914,7 @@ document.getElementById('amountInput').addEventListener('keydown', function(e) {
 
 // ── Init ──
 initMonth();
+document.getElementById('datePickerInput').value = getTodayString();
 render();
 
 // ── Service Worker Registration ──
