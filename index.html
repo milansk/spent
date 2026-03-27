@@ -85,6 +85,7 @@
     font-size: 13px;
     color: var(--text2);
     min-width: 90px;
+    max-width: 180px;
     text-align: center;
   }
 
@@ -756,9 +757,26 @@ function getMonthEntries() {
 
 // ── Rendering ──
 function render() {
-  // Month label
   const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  document.getElementById('monthLabel').textContent = `${monthNames[viewMonth]} ${viewYear}`;
+
+  // Month label — show both months when cycle spans a calendar boundary
+  const { start: cStart, end: cEnd } = getCycleBounds(viewYear, viewMonth);
+  const sDate = new Date(cStart), eDate = new Date(cEnd);
+  let cycleLabel;
+  if (sDate.getMonth() !== eDate.getMonth() || sDate.getFullYear() !== eDate.getFullYear()) {
+    const sy = sDate.getFullYear(), ey = eDate.getFullYear();
+    cycleLabel = sy === ey
+      ? `${monthNames[sDate.getMonth()]}/${monthNames[eDate.getMonth()]} ${sy}`
+      : `${monthNames[sDate.getMonth()]} ${sy}/${monthNames[eDate.getMonth()]} ${ey}`;
+  } else {
+    cycleLabel = `${monthNames[viewMonth]} ${viewYear}`;
+  }
+  document.getElementById('monthLabel').textContent = cycleLabel;
+
+  // Daily Black budget for per-day dots
+  const budgetStr = localStorage.getItem(BUDGET_KEY);
+  const cycleDays = Math.round((cEnd - cStart) / 86400000) + 1;
+  const dailyBlack = budgetStr ? parseFloat(budgetStr) / cycleDays : null;
 
   const entries = getMonthEntries();
   const total = entries.reduce((s, e) => s + e.amount, 0);
@@ -809,8 +827,15 @@ function render() {
     const dayLabel = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
     const dayTotal = groups[day].reduce((s, e) => s + e.amount, 0);
 
+    let dot = '';
+    if (dailyBlack !== null) {
+      const dayBlack = groups[day].reduce((s, e) => s + ((e.category || 'Black') === 'Black' ? e.amount : 0), 0);
+      const dotColor = dayBlack <= dailyBlack ? '#44cc66' : '#ff4444';
+      dot = `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${dotColor};margin-right:6px;vertical-align:middle;flex-shrink:0"></span>`;
+    }
+
     html += `<div class="day-group">`;
-    html += `<div class="day-header"><span>${dayLabel}</span><span>${formatMoney(dayTotal)}</span></div>`;
+    html += `<div class="day-header"><span>${dot}${dayLabel}</span><span>${formatMoney(dayTotal)}</span></div>`;
 
     groups[day].forEach(e => {
       const t = new Date(e.ts);
