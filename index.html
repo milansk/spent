@@ -474,33 +474,42 @@
     color: var(--accent);
   }
 
-  /* ── Budget badge ── */
-  .black-top-row {
+  /* ── Budget bar ── */
+  .budget-bar-row {
     display: flex;
     align-items: center;
+    gap: 7px;
+    margin-top: 3px;
   }
 
-  .budget-badge {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    gap: 8px;
-    margin-left: auto;
-  }
-
-  .budget-dot {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    flex-shrink: 0;
+  .budget-bar-line {
+    flex: 1;
+    height: 2px;
+    border-radius: 1px;
+    background: var(--border);
   }
 
   .budget-delta {
     font-family: ui-monospace, 'Cascadia Code', 'Menlo', 'Consolas', monospace;
-    font-size: 16px;
+    font-size: 11px;
     font-weight: 700;
     white-space: nowrap;
   }
+
+  /* ── Drawer toggle ── */
+  .drawer-toggle {
+    background: none;
+    border: none;
+    color: var(--text2);
+    font-size: 13px;
+    cursor: pointer;
+    padding: 0 0 0 4px;
+    line-height: 1;
+    flex-shrink: 0;
+    opacity: 0.6;
+  }
+
+  .drawer-toggle:active { opacity: 1; }
 
   /* ── Category summary ── */
   .cat-black-amount {
@@ -589,15 +598,14 @@
 
   <!-- Summary -->
   <div class="summary">
-    <div class="black-top-row">
-      <div class="cat-black-amount" id="catBlack">$0</div>
-      <div class="budget-badge" id="budgetBadge" style="display:none">
-        <div class="budget-dot" id="budgetDot"></div>
-        <div class="budget-delta" id="budgetDelta"></div>
-      </div>
+    <div class="cat-black-amount" id="catBlack">$0</div>
+    <div class="budget-bar-row">
+      <span class="cat-black-label">Black</span>
+      <div class="budget-bar-line" id="budgetBarLine"></div>
+      <span class="budget-delta" id="budgetDelta"></span>
+      <button class="drawer-toggle" id="drawerToggle" onclick="toggleDrawer()">▾</button>
     </div>
-    <div class="cat-black-label">Black</div>
-    <div class="cat-others">
+    <div class="cat-others" id="catOthers">
       <div class="cat-other-item">
         <div class="cat-other-name">Mid</div>
         <div class="cat-other-val" id="catMid">$0</div>
@@ -936,9 +944,14 @@ function clearMonth() {
 
 // ── Budget ──
 function updateBudgetBadge(blackSpend) {
-  const badge = document.getElementById('budgetBadge');
+  const line = document.getElementById('budgetBarLine');
+  const deltaEl = document.getElementById('budgetDelta');
   const budgetStr = localStorage.getItem(BUDGET_KEY);
-  if (!budgetStr) { badge.style.display = 'none'; return; }
+  if (!budgetStr) {
+    line.style.background = 'var(--border)';
+    deltaEl.textContent = '';
+    return;
+  }
 
   const budget = parseFloat(budgetStr);
   const today = new Date();
@@ -956,7 +969,7 @@ function updateBudgetBadge(blackSpend) {
   const ratio = expected > 0 ? blackSpend / expected : 0;
 
   // HSL: 0=red, 60=yellow, 120=green
-  // under (ratio 0→1): green→yellow; over (ratio 1→1.2): yellow→red (full red at 20% over)
+  // under (ratio 0→1): green→yellow; over (ratio 1→1.2): yellow→red
   let hue;
   if (ratio <= 1) {
     hue = 60 + (1 - ratio) * 60;
@@ -965,11 +978,19 @@ function updateBudgetBadge(blackSpend) {
   }
   const color = `hsl(${Math.round(hue)}, 75%, 48%)`;
 
+  line.style.background = color;
   const absStr = shortAmount(Math.abs(delta));
-  document.getElementById('budgetDot').style.background = color;
-  document.getElementById('budgetDelta').textContent = delta > 0 ? `+${absStr}` : `−${absStr}`;
-  document.getElementById('budgetDelta').style.color = color;
-  badge.style.display = 'flex';
+  deltaEl.textContent = delta > 0 ? `+${absStr}` : `−${absStr}`;
+  deltaEl.style.color = color;
+}
+
+// ── Drawer ──
+function toggleDrawer() {
+  const el = document.getElementById('catOthers');
+  const btn = document.getElementById('drawerToggle');
+  const hidden = el.style.display === 'none';
+  el.style.display = hidden ? '' : 'none';
+  btn.textContent = hidden ? '▾' : '▴';
 }
 
 function setBudget() {
