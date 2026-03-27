@@ -530,32 +530,33 @@
   }
 
   .cat-others {
-    margin-top: 10px;
+    margin-top: 8px;
     display: flex;
-    gap: 16px;
-    align-items: flex-start;
-  }
-
-  .cat-total-item {
-    margin-left: auto;
-    text-align: right;
-  }
-
-  .cat-total-val {
-    font-family: ui-monospace, 'Cascadia Code', 'Menlo', 'Consolas', monospace;
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--text2);
+    flex-direction: column;
+    gap: 5px;
   }
 
   .cat-other-item {
     display: flex;
-    flex-direction: column;
-    gap: 2px;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+
+  .cat-total-item {
+    margin-top: 3px;
+    padding-top: 5px;
+    border-top: 1px solid var(--border);
+  }
+
+  .cat-total-val {
+    font-family: ui-monospace, 'Cascadia Code', 'Menlo', 'Consolas', monospace;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text2);
   }
 
   .cat-other-name {
-    font-size: 10px;
+    font-size: 11px;
     color: var(--text2);
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -563,7 +564,7 @@
 
   .cat-other-val {
     font-family: ui-monospace, 'Cascadia Code', 'Menlo', 'Consolas', monospace;
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 600;
     color: var(--text);
   }
@@ -605,7 +606,7 @@
       <span class="budget-delta" id="budgetDelta"></span>
       <button class="drawer-toggle" id="drawerToggle" onclick="toggleDrawer()">▾</button>
     </div>
-    <div class="cat-others" id="catOthers">
+    <div class="cat-others" id="catOthers" style="display:none">
       <div class="cat-other-item">
         <div class="cat-other-name">Mid</div>
         <div class="cat-other-val" id="catMid">$0</div>
@@ -663,6 +664,9 @@
     <button class="menu-item" onclick="setBudget()">
       <span class="mi-icon">🎯</span> Set Black Budget
     </button>
+    <button class="menu-item" onclick="setCycleStart()">
+      <span class="mi-icon">🗓</span> Set Cycle Start Day
+    </button>
     <button class="menu-item" onclick="clearMonth()">
       <span class="mi-icon">🗑️</span> Clear this month
     </button>
@@ -677,14 +681,50 @@
 // ── State ──
 const STORAGE_KEY = 'spent_entries';
 const BUDGET_KEY  = 'spent_black_budget';
+const CYCLE_KEY   = 'spent_cycle_start';
 let viewYear, viewMonth; // 0-indexed month
 
 function now() { return new Date(); }
 
+// ── Cycle helpers ──
+function getCycleStart() {
+  const v = localStorage.getItem(CYCLE_KEY);
+  return v ? parseInt(v) : null;
+}
+
+// Returns {start, end} as timestamps for the billing cycle of (year, month)
+function getCycleBounds(year, month) {
+  const startDay = getCycleStart();
+  if (!startDay) {
+    return {
+      start: new Date(year, month, 1, 0, 0, 0, 0).getTime(),
+      end:   new Date(year, month + 1, 0, 23, 59, 59, 999).getTime()
+    };
+  }
+  return {
+    start: new Date(year, month, startDay, 0, 0, 0, 0).getTime(),
+    end:   new Date(year, month + 1, startDay - 1, 23, 59, 59, 999).getTime()
+  };
+}
+
+// Given a timestamp, return the {year, month} of the cycle it belongs to
+function cycleMonthForTs(ts) {
+  const d = new Date(ts);
+  const startDay = getCycleStart();
+  if (!startDay || d.getDate() >= startDay) {
+    return { year: d.getFullYear(), month: d.getMonth() };
+  }
+  // Before this month's cycle start → belongs to previous month's cycle
+  let month = d.getMonth() - 1;
+  let year = d.getFullYear();
+  if (month < 0) { month = 11; year--; }
+  return { year, month };
+}
+
 function initMonth() {
-  const d = now();
-  viewYear = d.getFullYear();
-  viewMonth = d.getMonth();
+  const { year, month } = cycleMonthForTs(Date.now());
+  viewYear = year;
+  viewMonth = month;
 }
 
 // ── Storage ──
@@ -700,10 +740,10 @@ function saveAll(entries) {
 
 // ── Filtering ──
 function getMonthEntries() {
-  return loadAll().filter(e => {
-    const d = new Date(e.ts);
-    return d.getFullYear() === viewYear && d.getMonth() === viewMonth;
-  }).sort((a, b) => b.ts - a.ts);
+  const { start, end } = getCycleBounds(viewYear, viewMonth);
+  return loadAll()
+    .filter(e => e.ts >= start && e.ts <= end)
+    .sort((a, b) => b.ts - a.ts);
 }
 
 // ── Rendering ──
@@ -862,10 +902,10 @@ function addEntry() {
   document.getElementById('datePickerInput').value = getTodayString();
   onDateChange();
 
-  // Jump to the month of the added entry
-  const entryDate = new Date(ts);
-  viewYear = entryDate.getFullYear();
-  viewMonth = entryDate.getMonth();
+  // Jump to the cycle that contains this entry
+  const { year, month } = cycleMonthForTs(ts);
+  viewYear = year;
+  viewMonth = month;
 
   render();
   toast('Added!');
@@ -932,10 +972,8 @@ function emailCSV() {
 function clearMonth() {
   const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   if (!confirm(`Delete all entries for ${monthNames[viewMonth]} ${viewYear}?`)) return;
-  const entries = loadAll().filter(e => {
-    const d = new Date(e.ts);
-    return !(d.getFullYear() === viewYear && d.getMonth() === viewMonth);
-  });
+  const { start, end } = getCycleBounds(viewYear, viewMonth);
+  const entries = loadAll().filter(e => e.ts < start || e.ts > end);
   saveAll(entries);
   render();
   toggleMenu();
@@ -954,13 +992,15 @@ function updateBudgetBadge(blackSpend) {
   }
 
   const budget = parseFloat(budgetStr);
-  const today = new Date();
-  const isCurrentMonth = viewYear === today.getFullYear() && viewMonth === today.getMonth();
+  const { start, end } = getCycleBounds(viewYear, viewMonth);
+  const nowTs = Date.now();
+  const isCurrentCycle = nowTs >= start && nowTs <= end;
 
   let expected;
-  if (isCurrentMonth) {
-    const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
-    expected = (budget / daysInMonth) * today.getDate();
+  if (isCurrentCycle) {
+    const cycleDays = Math.round((end - start) / 86400000) + 1;
+    const daysElapsed = Math.round((nowTs - start) / 86400000) + 1;
+    expected = (budget / cycleDays) * Math.min(daysElapsed, cycleDays);
   } else {
     expected = budget;
   }
@@ -990,7 +1030,7 @@ function toggleDrawer() {
   const btn = document.getElementById('drawerToggle');
   const hidden = el.style.display === 'none';
   el.style.display = hidden ? '' : 'none';
-  btn.textContent = hidden ? '▾' : '▴';
+  btn.textContent = hidden ? '▴' : '▾';
 }
 
 function setBudget() {
@@ -1006,6 +1046,23 @@ function setBudget() {
     toast('Budget cleared');
   }
   toggleMenu();
+  render();
+}
+
+function setCycleStart() {
+  const current = localStorage.getItem(CYCLE_KEY) || '';
+  const val = prompt('Billing cycle start day (1–28):\n(Leave empty to use calendar months)', current);
+  if (val === null) { toggleMenu(); return; }
+  const num = parseInt(val);
+  if (!isNaN(num) && num >= 1 && num <= 28) {
+    localStorage.setItem(CYCLE_KEY, num);
+    toast('Cycle starts on day ' + num);
+  } else if (val.trim() === '') {
+    localStorage.removeItem(CYCLE_KEY);
+    toast('Using calendar months');
+  }
+  toggleMenu();
+  initMonth();
   render();
 }
 
