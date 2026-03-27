@@ -664,8 +664,8 @@
     <button class="menu-item" onclick="setBudget()">
       <span class="mi-icon">🎯</span> Set Black Budget
     </button>
-    <button class="menu-item" onclick="setCycleStart()">
-      <span class="mi-icon">🗓</span> Set Cycle Start Day
+    <button class="menu-item" onclick="setCycleForMonth()">
+      <span class="mi-icon">🗓</span> Set Cycle for This Month
     </button>
     <button class="menu-item" onclick="clearMonth()">
       <span class="mi-icon">🗑️</span> Clear this month
@@ -681,44 +681,52 @@
 // ── State ──
 const STORAGE_KEY = 'spent_entries';
 const BUDGET_KEY  = 'spent_black_budget';
-const CYCLE_KEY   = 'spent_cycle_start';
+const CYCLES_KEY  = 'spent_cycles'; // per-month: { "2026-2": {start:24, end:25}, ... }
 let viewYear, viewMonth; // 0-indexed month
 
 function now() { return new Date(); }
 
 // ── Cycle helpers ──
-function getCycleStart() {
-  const v = localStorage.getItem(CYCLE_KEY);
-  return v ? parseInt(v) : null;
+function getCycles() {
+  try { return JSON.parse(localStorage.getItem(CYCLES_KEY) || '{}'); } catch { return {}; }
 }
+function saveCycles(c) { localStorage.setItem(CYCLES_KEY, JSON.stringify(c)); }
 
-// Returns {start, end} as timestamps for the billing cycle of (year, month)
+// Returns {start, end} as timestamps for the billing cycle of (year, month).
+// start = startDay of that month; end = endDay of the FOLLOWING month.
+// If no config: full calendar month.
 function getCycleBounds(year, month) {
-  const startDay = getCycleStart();
-  if (!startDay) {
+  const c = getCycles()[`${year}-${month}`];
+  if (!c) {
     return {
       start: new Date(year, month, 1, 0, 0, 0, 0).getTime(),
       end:   new Date(year, month + 1, 0, 23, 59, 59, 999).getTime()
     };
   }
   return {
-    start: new Date(year, month, startDay, 0, 0, 0, 0).getTime(),
-    end:   new Date(year, month + 1, startDay - 1, 23, 59, 59, 999).getTime()
+    start: new Date(year, month,     c.start, 0, 0, 0, 0).getTime(),
+    end:   new Date(year, month + 1, c.end,  23, 59, 59, 999).getTime()
   };
 }
 
-// Given a timestamp, return the {year, month} of the cycle it belongs to
+// Given a timestamp, find which cycle (year, month) it belongs to.
+// A cycle for month M can extend into month M+1, so an entry in M+1
+// might still belong to cycle M.
 function cycleMonthForTs(ts) {
   const d = new Date(ts);
-  const startDay = getCycleStart();
-  if (!startDay || d.getDate() >= startDay) {
-    return { year: d.getFullYear(), month: d.getMonth() };
-  }
-  // Before this month's cycle start → belongs to previous month's cycle
-  let month = d.getMonth() - 1;
-  let year = d.getFullYear();
-  if (month < 0) { month = 11; year--; }
-  return { year, month };
+  const y = d.getFullYear(), m = d.getMonth();
+
+  // Check current calendar month's cycle first
+  const cur = getCycleBounds(y, m);
+  if (ts >= cur.start && ts <= cur.end) return { year: y, month: m };
+
+  // Check previous calendar month's cycle (might extend into this month)
+  let py = y, pm = m - 1;
+  if (pm < 0) { pm = 11; py--; }
+  const prev = getCycleBounds(py, pm);
+  if (ts >= prev.start && ts <= prev.end) return { year: py, month: pm };
+
+  return { year: y, month: m }; // fallback
 }
 
 function initMonth() {
@@ -1049,17 +1057,36 @@ function setBudget() {
   render();
 }
 
-function setCycleStart() {
-  const current = localStorage.getItem(CYCLE_KEY) || '';
-  const val = prompt('Billing cycle start day (1–28):\n(Leave empty to use calendar months)', current);
-  if (val === null) { toggleMenu(); return; }
-  const num = parseInt(val);
-  if (!isNaN(num) && num >= 1 && num <= 28) {
-    localStorage.setItem(CYCLE_KEY, num);
-    toast('Cycle starts on day ' + num);
-  } else if (val.trim() === '') {
-    localStorage.removeItem(CYCLE_KEY);
-    toast('Using calendar months');
+function setCycleForMonth() {
+  const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const nextMonth  = monthNames[(viewMonth + 1) % 12];
+  const key = `${viewYear}-${viewMonth}`;
+  const cycles = getCycles();
+  const cur = cycles[key];
+
+  const s = prompt(
+    `${monthNames[viewMonth]} ${viewYear} — cycle START day (1–31):\n` +
+    `(currently: ${cur ? cur.start : 'default 1st'})`,
+    cur ? cur.start : ''
+  );
+  if (s === null) { toggleMenu(); return; }
+
+  const e = prompt(
+    `${monthNames[viewMonth]} ${viewYear} — cycle END day in ${nextMonth} (1–31):\n` +
+    `(currently: ${cur ? cur.end : 'default last day'})`,
+    cur ? cur.end : ''
+  );
+  if (e === null) { toggleMenu(); return; }
+
+  const sn = parseInt(s), en = parseInt(e);
+  if (s.trim() === '' && e.trim() === '') {
+    delete cycles[key];
+    saveCycles(cycles);
+    toast('Reset to calendar month');
+  } else if (!isNaN(sn) && sn >= 1 && sn <= 31 && !isNaN(en) && en >= 1 && en <= 31) {
+    cycles[key] = { start: sn, end: en };
+    saveCycles(cycles);
+    toast(`${monthNames[viewMonth]}: day ${sn} → ${nextMonth} ${en}`);
   }
   toggleMenu();
   initMonth();
