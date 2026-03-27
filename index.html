@@ -474,6 +474,34 @@
     color: var(--accent);
   }
 
+  /* ── Budget badge ── */
+  .black-top-row {
+    display: flex;
+    align-items: center;
+  }
+
+  .budget-badge {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+  }
+
+  .budget-dot {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .budget-delta {
+    font-family: ui-monospace, 'Cascadia Code', 'Menlo', 'Consolas', monospace;
+    font-size: 16px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
   /* ── Category summary ── */
   .cat-black-amount {
     font-family: ui-monospace, 'Cascadia Code', 'Menlo', 'Consolas', monospace;
@@ -561,7 +589,13 @@
 
   <!-- Summary -->
   <div class="summary">
-    <div class="cat-black-amount" id="catBlack">$0</div>
+    <div class="black-top-row">
+      <div class="cat-black-amount" id="catBlack">$0</div>
+      <div class="budget-badge" id="budgetBadge" style="display:none">
+        <div class="budget-dot" id="budgetDot"></div>
+        <div class="budget-delta" id="budgetDelta"></div>
+      </div>
+    </div>
     <div class="cat-black-label">Black</div>
     <div class="cat-others">
       <div class="cat-other-item">
@@ -618,6 +652,9 @@
     <button class="menu-item" onclick="emailCSV()">
       <span class="mi-icon">✉️</span> Send via Email
     </button>
+    <button class="menu-item" onclick="setBudget()">
+      <span class="mi-icon">🎯</span> Set Black Budget
+    </button>
     <button class="menu-item" onclick="clearMonth()">
       <span class="mi-icon">🗑️</span> Clear this month
     </button>
@@ -631,6 +668,7 @@
 <script>
 // ── State ──
 const STORAGE_KEY = 'spent_entries';
+const BUDGET_KEY  = 'spent_black_budget';
 let viewYear, viewMonth; // 0-indexed month
 
 function now() { return new Date(); }
@@ -676,6 +714,7 @@ function render() {
   document.getElementById('catMid').textContent = formatMoney(catTotals.Mid);
   document.getElementById('catSmall').textContent = formatMoney(catTotals.Small);
   document.getElementById('catCCTE').textContent = formatMoney(catTotals.CCTE);
+  updateBudgetBadge(catTotals.Black);
 
   const container = document.getElementById('listContainer');
 
@@ -742,6 +781,12 @@ function render() {
 
 function formatMoney(n) {
   return '$' + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function shortAmount(n) {
+  if (n >= 1000000) return (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+  if (n >= 1000)    return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+  return Math.round(n).toString();
 }
 
 function escapeHtml(s) {
@@ -887,6 +932,60 @@ function clearMonth() {
   render();
   toggleMenu();
   toast('Month cleared');
+}
+
+// ── Budget ──
+function updateBudgetBadge(blackSpend) {
+  const badge = document.getElementById('budgetBadge');
+  const budgetStr = localStorage.getItem(BUDGET_KEY);
+  if (!budgetStr) { badge.style.display = 'none'; return; }
+
+  const budget = parseFloat(budgetStr);
+  const today = new Date();
+  const isCurrentMonth = viewYear === today.getFullYear() && viewMonth === today.getMonth();
+
+  let expected;
+  if (isCurrentMonth) {
+    const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+    expected = (budget / daysInMonth) * today.getDate();
+  } else {
+    expected = budget;
+  }
+
+  const delta = blackSpend - expected; // + = over, - = under
+  const ratio = expected > 0 ? blackSpend / expected : 0;
+
+  // HSL: 0=red, 60=yellow, 120=green
+  // under (ratio 0→1): green→yellow; over (ratio 1→1.2): yellow→red (full red at 20% over)
+  let hue;
+  if (ratio <= 1) {
+    hue = 60 + (1 - ratio) * 60;
+  } else {
+    hue = Math.max(0, 60 - (ratio - 1) * 300);
+  }
+  const color = `hsl(${Math.round(hue)}, 75%, 48%)`;
+
+  const absStr = shortAmount(Math.abs(delta));
+  document.getElementById('budgetDot').style.background = color;
+  document.getElementById('budgetDelta').textContent = delta > 0 ? `+${absStr}` : `−${absStr}`;
+  document.getElementById('budgetDelta').style.color = color;
+  badge.style.display = 'flex';
+}
+
+function setBudget() {
+  const current = localStorage.getItem(BUDGET_KEY) || '';
+  const val = prompt('Monthly Black card budget ($):\n(Leave empty to clear)', current);
+  if (val === null) { toggleMenu(); return; }
+  const num = parseFloat(val);
+  if (!isNaN(num) && num > 0) {
+    localStorage.setItem(BUDGET_KEY, num.toFixed(2));
+    toast('Budget set!');
+  } else if (val.trim() === '') {
+    localStorage.removeItem(BUDGET_KEY);
+    toast('Budget cleared');
+  }
+  toggleMenu();
+  render();
 }
 
 // ── Menu ──
