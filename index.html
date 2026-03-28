@@ -775,7 +775,7 @@ function render() {
 
   // Daily Black budget for per-day dots
   const budgetStr = localStorage.getItem(BUDGET_KEY);
-  const cycleDays = Math.round((cEnd - cStart) / 86400000) + 1;
+  const cycleDays = Math.floor((cEnd - cStart) / 86400000) + 1;
   const dailyBlack = budgetStr ? parseFloat(budgetStr) / cycleDays : null;
 
   const entries = getMonthEntries();
@@ -1031,14 +1031,14 @@ function updateBudgetBadge(blackSpend) {
 
   let expected;
   if (isCurrentCycle) {
-    const cycleDays = Math.round((end - start) / 86400000) + 1;
-    const daysElapsed = Math.round((nowTs - start) / 86400000) + 1;
+    const cycleDays   = Math.floor((end - start) / 86400000) + 1;
+    const daysElapsed = Math.floor((nowTs - start) / 86400000) + 1;
     expected = (budget / cycleDays) * Math.min(daysElapsed, cycleDays);
   } else {
     expected = budget;
   }
 
-  const delta = blackSpend - expected; // + = over, - = under
+  const delta = expected - blackSpend; // + = budget remaining, - = over budget
   const ratio = expected > 0 ? blackSpend / expected : 0;
 
   // HSL: 0=red, 60=yellow, 120=green
@@ -1053,7 +1053,7 @@ function updateBudgetBadge(blackSpend) {
 
   line.style.background = color;
   const absStr = shortAmount(Math.abs(delta));
-  deltaEl.textContent = delta > 0 ? `+${absStr}` : `−${absStr}`;
+  deltaEl.textContent = delta >= 0 ? `+${absStr}` : `−${absStr}`;
   deltaEl.style.color = color;
 }
 
