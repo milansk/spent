@@ -1149,6 +1149,29 @@ initMonth();
 document.getElementById('datePickerInput').value = getTodayString();
 render();
 
+// ── Midnight refresh ──
+let _lastDate = new Date().toDateString();
+
+function checkDateChange() {
+  const today = new Date().toDateString();
+  if (today !== _lastDate) {
+    _lastDate = today;
+    render();
+  }
+}
+
+// Fires when user brings app back from background (the key fix for Android)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') checkDateChange();
+});
+
+// Also fire exactly at midnight if the app stays open
+(function scheduleMidnight() {
+  const now = new Date();
+  const ms = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime() - now.getTime();
+  setTimeout(() => { checkDateChange(); scheduleMidnight(); }, ms);
+})();
+
 // ── Service Worker Registration ──
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js');
